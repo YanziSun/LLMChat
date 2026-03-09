@@ -2,7 +2,17 @@
 
 一个 macOS 桌面 AI 聊天客户端，支持多模型对话、分支树结构和图片/文件上传。
 
-![LLMChat](https://img.shields.io/badge/platform-macOS-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tauri](https://img.shields.io/badge/Tauri-2.x-orange)
+![LLMChat](https://img.shields.io/badge/platform-macOS-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Tauri](https://img.shields.io/badge/Tauri-2.x-orange) ![Release](https://img.shields.io/github/v/release/YanziSun/LLMChat)
+
+## 下载
+
+**[⬇ 下载 LLMChat v0.1.0（macOS Apple Silicon）](https://github.com/YanziSun/LLMChat/releases/download/v0.1.0/LLMChat_0.1.0_aarch64.dmg)**
+
+> 首次打开提示"无法打开"或"应用已损坏"？运行以下命令即可：
+> ```bash
+> xattr -cr /Applications/LLMChat.app
+> ```
+> 或将 `.app` 拖入 `/Applications` 后右键 → 打开。
 
 ## 功能特性
 
@@ -22,13 +32,24 @@
 
 ## 系统要求
 
-- macOS 12+（Apple Silicon / Intel 均支持）
-- [Node.js](https://nodejs.org/) 18+
-- [Rust](https://rustup.rs/) 1.70+
+- macOS 12+（Apple Silicon）
+- 自行编译需要：[Node.js](https://nodejs.org/) 18+、[Rust](https://rustup.rs/) 1.70+
 
 ## 快速开始
 
-### 安装依赖
+### 直接安装（推荐）
+
+1. [下载 DMG](https://github.com/YanziSun/LLMChat/releases/download/v0.1.0/LLMChat_0.1.0_aarch64.dmg)
+2. 打开 DMG，将 `LLMChat.app` 拖入 `/Applications`
+3. 首次打开若提示"无法验证"，在终端运行：
+   ```bash
+   xattr -cr /Applications/LLMChat.app
+   ```
+4. 在 **Settings** 中添加模型即可开始使用
+
+### 从源码编译
+
+#### 安装依赖
 
 ```bash
 # 安装前端依赖
