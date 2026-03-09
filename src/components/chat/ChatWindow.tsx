@@ -86,14 +86,26 @@ export function ChatWindow() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const prevConvIdRef = useRef<string | null>(null)
+  const prevPathLenRef = useRef<number>(0)
 
   const conv = getConversation()
   const activePath = getActivePath()
   const messageMap = getMessageMap()
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activePath.length, isStreaming])
+    const convChanged = activeConversationId !== prevConvIdRef.current
+    const newMessage = !convChanged && activePath.length > prevPathLenRef.current
+
+    prevConvIdRef.current = activeConversationId ?? null
+    prevPathLenRef.current = activePath.length
+
+    // Only scroll to bottom when a new message arrives or streaming updates,
+    // not when switching conversations (which should keep the scroll position).
+    if (newMessage || (isStreaming && !convChanged)) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [activeConversationId, activePath.length, isStreaming])
 
   useEffect(() => {
     const ta = textareaRef.current

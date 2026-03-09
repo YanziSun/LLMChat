@@ -66,12 +66,34 @@ function extractText(node: ReactNode): string {
   return ''
 }
 
+// Clipboard helper with fallback for Tauri/non-HTTPS environments
+function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text)
+    })
+  }
+  fallbackCopy(text)
+  return Promise.resolve()
+}
+
+function fallbackCopy(text: string) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+  document.body.appendChild(ta)
+  ta.focus()
+  ta.select()
+  document.execCommand('copy')
+  document.body.removeChild(ta)
+}
+
 // Code block with language label + copy button
 // children: already-highlighted React nodes from rehype-highlight
 function CodeBlock({ language, children }: { language: string; children: ReactNode }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = () => {
-    navigator.clipboard.writeText(extractText(children).replace(/\n$/, ''))
+    copyToClipboard(extractText(children).replace(/\n$/, ''))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -249,7 +271,6 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
 }
 
 export function MessageBubble({ message, onFork, siblings, activeSiblingIndex, onSwitchBranch }: MessageBubbleProps) {
-  const [hovered, setHovered] = useState(false)
   const [copied, setCopied] = useState(false)
   const { getModel } = useModelStore()
 
@@ -259,17 +280,13 @@ export function MessageBubble({ message, onFork, siblings, activeSiblingIndex, o
   const isError = !isUser && isErrorContent(message.content)
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(message.content)
+    copyToClipboard(message.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [message.content])
 
   return (
-    <div
-      className={`group flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className={`group flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[80%]`}>
         {/* Model label */}
         {!isUser && model && (
@@ -279,7 +296,7 @@ export function MessageBubble({ message, onFork, siblings, activeSiblingIndex, o
         <div className="flex items-end gap-2">
           {/* Action buttons — left side for assistant */}
           {!isUser && (
-            <div className={`flex flex-col gap-1 mb-1 transition-opacity ${hovered ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex flex-col gap-1 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={handleCopy}
                 title="Copy"
@@ -329,7 +346,7 @@ export function MessageBubble({ message, onFork, siblings, activeSiblingIndex, o
 
           {/* Action buttons — right side for user */}
           {isUser && (
-            <div className={`flex flex-col gap-1 mb-1 transition-opacity ${hovered ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex flex-col gap-1 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={handleCopy}
                 title="Copy"
