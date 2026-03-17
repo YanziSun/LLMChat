@@ -84,6 +84,7 @@ export async function loadConversations(): Promise<Conversation[]> {
       activePathIds: JSON.parse(r.active_path_ids),
       systemPrompt: r.system_prompt ?? undefined,
       modelInstructions: r.model_instructions ? JSON.parse(r.model_instructions) : undefined,
+      tags: r.tags ? JSON.parse(r.tags) : [],
       createdAt: r.created_at, updatedAt: r.updated_at
     }))
   }
@@ -95,12 +96,13 @@ export async function saveConversation(conv: Conversation): Promise<void> {
   if (db) {
     await db.execute(
       `INSERT OR REPLACE INTO conversations
-       (id, title, mode, models, root_message_id, active_path_ids, system_prompt, model_instructions, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       (id, title, mode, models, root_message_id, active_path_ids, system_prompt, model_instructions, tags, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [conv.id, conv.title, conv.mode, JSON.stringify(conv.models),
        conv.rootMessageId, JSON.stringify(conv.activePathIds),
        conv.systemPrompt ?? null,
        conv.modelInstructions ? JSON.stringify(conv.modelInstructions) : null,
+       conv.tags?.length ? JSON.stringify(conv.tags) : null,
        conv.createdAt, conv.updatedAt]
     )
     return
