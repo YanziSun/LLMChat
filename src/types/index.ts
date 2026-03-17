@@ -38,6 +38,7 @@ export interface Conversation {
   activePathIds: string[]
   systemPrompt?: string   // per-conversation system instructions
   modelInstructions?: Record<string, string>  // round-robin: per-model instructions (modelId → prompt)
+  tags?: string[]
   createdAt: number
   updatedAt: number
 }
