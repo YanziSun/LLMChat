@@ -60,6 +60,12 @@ pub fn run() {
             sql: "ALTER TABLE messages ADD COLUMN attachments TEXT DEFAULT NULL;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "add_tags_to_conversations",
+            sql: "ALTER TABLE conversations ADD COLUMN tags TEXT DEFAULT NULL;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
