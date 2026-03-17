@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Settings, MessageSquare, Trash2, Bot, GitMerge, RotateCcw, ChevronDown, ChevronUp, ScrollText } from 'lucide-react'
 import { useConversationStore } from './stores/conversationStore'
 import { useModelStore } from './stores/modelStore'
@@ -10,6 +10,23 @@ import type { ConversationMode } from './types'
 import 'highlight.js/styles/github-dark.css'
 
 type View = 'chat' | 'settings' | 'logs'
+
+const TAG_COLORS = [
+  { bg: '#1d4ed8', text: '#bfdbfe' },
+  { bg: '#14532d', text: '#86efac' },
+  { bg: '#7c3aed', text: '#ddd6fe' },
+  { bg: '#92400e', text: '#fde68a' },
+  { bg: '#881337', text: '#fecdd3' },
+  { bg: '#164e63', text: '#a5f3fc' },
+  { bg: '#713f12', text: '#fed7aa' },
+  { bg: '#1e3a5f', text: '#bae6fd' },
+]
+
+function tagColor(name: string): { bg: string; text: string } {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return TAG_COLORS[h % TAG_COLORS.length]
+}
 
 const MODE_LABELS: Record<ConversationMode, { label: string; icon: React.ReactNode; desc: string }> = {
   'single': { label: 'Single', icon: <MessageSquare size={14} />, desc: 'One model' },
@@ -138,6 +155,99 @@ function NewConversationModal({
   )
 }
 
+function TagPicker({
+  currentTags,
+  allTags,
+  onAdd,
+  onRemove,
+  onClose,
+}: {
+  currentTags: string[]
+  allTags: string[]
+  onAdd: (tag: string) => void
+  onRemove: (tag: string) => void
+  onClose: () => void
+}) {
+  const [input, setInput] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  const filtered = allTags.filter(t =>
+    t.includes(input.toLowerCase()) && !currentTags.includes(t)
+  )
+  const canCreate = input.trim() && !allTags.includes(input.trim().toLowerCase())
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = input.trim().toLowerCase()
+      if (!val) return
+      onAdd(val)
+      setInput('')
+    }
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="absolute top-full left-0 mt-1 z-50 bg-[#1e293b] border border-[#334155] rounded-xl shadow-xl p-3 w-52"
+    >
+      <input
+        autoFocus
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="新建或搜索标签..."
+        className="w-full bg-[#0f1117] border border-[#334155] rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 mb-2"
+      />
+      <div className="flex flex-wrap gap-1.5">
+        {canCreate && (
+          <button
+            onClick={() => { onAdd(input.trim().toLowerCase()); setInput('') }}
+            className="text-[10px] border border-dashed border-blue-500 text-blue-400 px-2 py-0.5 rounded-full hover:bg-blue-500/10 transition-colors"
+          >
+            + 创建 &ldquo;{input.trim()}&rdquo;
+          </button>
+        )}
+        {filtered.map(tag => {
+          const { bg, text } = tagColor(tag)
+          return (
+            <button
+              key={tag}
+              onClick={() => onAdd(tag)}
+              style={{ background: bg, color: text }}
+              className="text-[10px] px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
+            >
+              #{tag}
+            </button>
+          )
+        })}
+        {currentTags.map(tag => {
+          const { bg, text } = tagColor(tag)
+          return (
+            <button
+              key={tag}
+              onClick={() => onRemove(tag)}
+              style={{ background: bg, color: text, opacity: 0.5 }}
+              className="text-[10px] px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity line-through"
+              title="点击移除"
+            >
+              #{tag}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const {
     conversations, activeConversationId,
@@ -153,7 +263,9 @@ export default function App() {
   const [view, setView] = useState<View>('chat')
   const [showNewModal, setShowNewModal] = useState(false)
   const [search, setSearch] = useState('')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
+  const [showTagPicker, setShowTagPicker] = useState(false)
   const [systemPromptDraft, setSystemPromptDraft] = useState('')
   const [modelInstructionsDraft, setModelInstructionsDraft] = useState<Record<string, string>>({})
   const [managing, setManaging] = useState(false)
@@ -172,6 +284,7 @@ export default function App() {
     setSystemPromptDraft(conv?.systemPrompt ?? '')
     setModelInstructionsDraft(conv?.modelInstructions ?? {})
     setShowSystemPrompt(false)
+    setShowTagPicker(false)
   }, [activeConversationId])
 
   const handleNewConversation = async (mode: ConversationMode, modelIds: string[], title: string) => {
@@ -185,8 +298,11 @@ export default function App() {
     setView('chat')
   }
 
+  const allTags = [...new Set(conversations.flatMap(c => c.tags ?? []))]
+
   const filteredConversations = conversations
     .filter(c => c.title.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => !activeTag || (c.tags ?? []).includes(activeTag))
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   const activeConv = conversations.find(c => c.id === activeConversationId)
@@ -222,6 +338,29 @@ export default function App() {
             className="w-full bg-[#1e293b] border border-transparent focus:border-[#334155] rounded-lg px-3 py-1.5 text-sm text-slate-300 placeholder-slate-600 focus:outline-none transition-colors"
           />
         </div>
+
+        {allTags.length > 0 && (
+          <div className="px-3 pb-1 flex gap-1.5 flex-wrap">
+            {allTags.map(tag => {
+              const { bg, text } = tagColor(tag)
+              const isActive = activeTag === tag
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTag(isActive ? null : tag)}
+                  style={isActive ? { background: bg, color: text } : {}}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                    isActive
+                      ? 'border-transparent'
+                      : 'border-[#334155] text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div className="px-3 pb-2 flex justify-end">
           <button
@@ -317,6 +456,22 @@ export default function App() {
                         {MODE_LABELS[conv.mode].label}
                       </div>
                     )}
+                    {(conv.tags ?? []).length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-0.5">
+                        {(conv.tags ?? []).map(tag => {
+                          const { bg, text } = tagColor(tag)
+                          return (
+                            <span
+                              key={tag}
+                              style={{ background: bg, color: text }}
+                              className="text-[9px] px-1.5 py-0 rounded-full leading-4"
+                            >
+                              #{tag}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                   {!managing && (
                     <button
@@ -396,6 +551,59 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {/* Tag row */}
+            <div className="px-6 py-1.5 flex items-center gap-2 flex-wrap border-t border-[#1f2937]/50">
+              <span className="text-[10px] text-slate-600 flex-shrink-0">标签</span>
+              {(activeConv.tags ?? []).map(tag => {
+                const { bg, text } = tagColor(tag)
+                return (
+                  <span
+                    key={tag}
+                    style={{ background: bg, color: text }}
+                    className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                  >
+                    #{tag}
+                    <button
+                      onClick={() => {
+                        const newTags = (activeConv.tags ?? []).filter(t => t !== tag)
+                        updateConversation(activeConv.id, { tags: newTags })
+                      }}
+                      className="hover:opacity-70 transition-opacity leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                )
+              })}
+              <div className="relative">
+                <button
+                  onClick={() => setShowTagPicker(v => !v)}
+                  className="text-[10px] border border-dashed border-slate-600 text-slate-500 hover:text-slate-300 hover:border-slate-400 px-2 py-0.5 rounded-full transition-colors"
+                >
+                  + 添加
+                </button>
+                {showTagPicker && (
+                  <TagPicker
+                    currentTags={activeConv.tags ?? []}
+                    allTags={allTags}
+                    onAdd={tag => {
+                      const current = activeConv.tags ?? []
+                      if (!current.includes(tag)) {
+                        updateConversation(activeConv.id, { tags: [...current, tag] })
+                      }
+                    }}
+                    onRemove={tag => {
+                      updateConversation(activeConv.id, {
+                        tags: (activeConv.tags ?? []).filter(t => t !== tag)
+                      })
+                    }}
+                    onClose={() => setShowTagPicker(false)}
+                  />
+                )}
+              </div>
+            </div>
+
             {showSystemPrompt && (
               <div className="px-6 pb-3">
                 {activeConv.mode === 'multi-roundrobin' ? (
